@@ -2,208 +2,378 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <title>AR Ad – Multiple Video Options</title>
+  <title>AR Experience</title>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
   <style>
-    html, body {
-      margin: 0; padding: 0; overflow: hidden; background: #000;
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --gold: #C9A84C;
+      --gold-light: #E8C96A;
+      --glass-bg: rgba(10, 10, 12, 0.55);
+      --glass-border: rgba(255,255,255,0.09);
+      --glass-blur: blur(18px);
+      --white: #FFFFFF;
+      --muted: rgba(255,255,255,0.45);
+      --hud-h: 160px;
     }
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: #000;
+      font-family: 'DM Sans', sans-serif;
+    }
+
     #cam {
       position: absolute;
-      top: 0; left: 0;
+      inset: 0;
       width: 100%; height: 100%;
       object-fit: cover;
     }
+
+    .bar-top, .bar-bottom-fill {
+      position: absolute;
+      left: 0; right: 0;
+      background: #000;
+      z-index: 2;
+      pointer-events: none;
+    }
+    .bar-top { top: 0; height: 60px; }
+    .bar-bottom-fill { bottom: 0; height: var(--hud-h); }
+
+    .vignette {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.7) 100%);
+      z-index: 3;
+      pointer-events: none;
+    }
+
     #ad {
       position: absolute;
       top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      max-width: 90%;
-      max-height: 90%;
-      border-radius: 12px;
-      border: 2px solid #fff;
+      max-width: 82%;
+      max-height: calc(100% - 180px);
+      border-radius: 4px;
       display: none;
-      z-index: 5;
+      z-index: 4;
       background: #000;
+      box-shadow: 0 0 0 1px rgba(201,168,76,0.3), 0 32px 80px rgba(0,0,0,0.8);
     }
-    #ppBtn {
+    #ad.visible { display: block; animation: fadeIn 0.5s ease; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translate(-50%, -48%); }
+      to   { opacity: 1; transform: translate(-50%, -50%); }
+    }
+
+    .top-bar {
       position: absolute;
-      top: calc(50% + 140px); left: 50%;
-      transform: translateX(-50%);
-      padding: 8px 12px;
-      font-size: 20px;
-      border: none;
-      border-radius: 50%;
-      background: #fff;
-      color: #000;
-      cursor: pointer;
+      top: 0; left: 0; right: 0;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
       z-index: 10;
-      box-shadow: 0 0 12px rgba(0,0,0,.6);
-      display: none;
     }
-    .thumbnail-bar {
+    .brand {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: 0.18em;
+      color: var(--white);
+      text-transform: uppercase;
+    }
+    .brand span { color: var(--gold); }
+    .top-badge {
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      color: var(--gold);
+      border: 1px solid rgba(201,168,76,0.35);
+      padding: 4px 10px;
+      border-radius: 20px;
+      text-transform: uppercase;
+    }
+
+    .hud {
       position: absolute;
-      bottom: 90px;
-      left: 50%;
-      transform: translateX(-50%);
+      bottom: 0; left: 0; right: 0;
+      height: var(--hud-h);
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 0 20px 20px;
+      gap: 14px;
+    }
+
+    .plans {
       display: flex;
       gap: 10px;
-      z-index: 10;
+      align-items: stretch;
     }
-    .thumbnail {
-      width: 60px;
-      height: 40px;
-      background: #fff;
-      border: 2px solid #ccc;
-      border-radius: 6px;
+    .plan-card {
+      flex: 1;
+      background: var(--glass-bg);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      padding: 10px 12px;
       cursor: pointer;
-      font-size: 12px;
+      transition: border-color 0.25s, background 0.25s;
       display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-      color: #000;
+      flex-direction: column;
+      gap: 3px;
+      position: relative;
+      overflow: hidden;
     }
-    .thumbnail.selected {
-      border: 2px solid #00f;
-    }
-
-    .bottom-buttons {
+    .plan-card::before {
+      content: '';
       position: absolute;
-      bottom: 10px;
-      width: 100%;
-      display: flex;
-      justify-content: space-around;
-      align-items: center;
-      z-index: 10;
-    }
-
-    .bottom-buttons button,
-    .bottom-buttons a {
+      top: 0; left: 0; right: 0;
+      height: 2px;
       background: transparent;
-      border: none;
-      padding: 0;
-      cursor: pointer;
+      transition: background 0.25s;
+    }
+    .plan-card.active {
+      border-color: rgba(201,168,76,0.5);
+      background: rgba(201,168,76,0.08);
+    }
+    .plan-card.active::before {
+      background: linear-gradient(90deg, var(--gold), var(--gold-light));
+    }
+    .plan-label {
+      font-family: 'Syne', sans-serif;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    .plan-card.active .plan-label { color: var(--gold-light); }
+    .plan-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--white);
     }
 
-    .bottom-buttons img {
-      width: 42px;
-      height: 42px;
-      object-fit: contain;
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
     }
+
+    #ppBtn {
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      border: 1px solid rgba(201,168,76,0.6);
+      background: var(--glass-bg);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.2s;
+    }
+    #ppBtn:active { transform: scale(0.94); }
+    #ppBtn svg { width: 16px; height: 16px; fill: var(--gold); }
+
+    .progress-wrap {
+      flex: 1;
+      height: 2px;
+      background: rgba(255,255,255,0.12);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--gold), var(--gold-light));
+      border-radius: 2px;
+      transition: width 0.3s linear;
+    }
+
+    .icon-btn {
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      border: 1px solid var(--glass-border);
+      background: var(--glass-bg);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: border-color 0.2s;
+    }
+    .icon-btn:active { transform: scale(0.94); }
+    .icon-btn svg { width: 18px; height: 18px; stroke: var(--white); fill: none; stroke-width: 1.6; }
+
+    .hint {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 6;
+      text-align: center;
+      pointer-events: none;
+      animation: pulse 3s ease-in-out infinite;
+    }
+    .hint-ring {
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      border: 1px solid rgba(201,168,76,0.4);
+      margin: 0 auto 14px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .hint-ring svg { width: 24px; height: 24px; stroke: var(--gold); fill: none; stroke-width: 1.5; }
+    .hint-text {
+      font-family: 'Syne', sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    @keyframes pulse {
+      0%,100% { opacity: 0.5; }
+      50% { opacity: 1; }
+    }
+    .hint.hidden { display: none; }
+
+    .corner {
+      position: absolute;
+      width: 20px; height: 20px;
+      border-color: rgba(201,168,76,0.5);
+      border-style: solid;
+      z-index: 5;
+      pointer-events: none;
+      opacity: 0.7;
+    }
+    .c-tl { top: 72px; left: 16px; border-width: 1px 0 0 1px; }
+    .c-tr { top: 72px; right: 16px; border-width: 1px 1px 0 0; }
+    .c-bl { bottom: calc(var(--hud-h) + 8px); left: 16px; border-width: 0 0 1px 1px; }
+    .c-br { bottom: calc(var(--hud-h) + 8px); right: 16px; border-width: 0 1px 1px 0; }
   </style>
 </head>
 <body>
 
 <video id="cam" autoplay muted playsinline></video>
-<video id="ad" playsinline loop></video>
-<button id="ppBtn" title="Play/Pause">▶️</button>
 
-<div class="thumbnail-bar">
-  <div class="thumbnail" data-src="advertisement/promo1.mp4">PLAN1</div>
-  <div class="thumbnail" data-src="advertisement/promo2.mp4">PLAN2</div>
-  <div class="thumbnail" data-src="advertisement/promo3.mp4">PLAN3</div>
+<div class="bar-top"></div>
+<div class="bar-bottom-fill"></div>
+<div class="vignette"></div>
+
+<div class="corner c-tl"></div>
+<div class="corner c-tr"></div>
+<div class="corner c-bl"></div>
+<div class="corner c-br"></div>
+
+<div class="hint" id="hint">
+  <div class="hint-ring">
+    <svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+  </div>
+  <p class="hint-text">Select a plan below</p>
 </div>
 
+<video id="ad" playsinline loop></video>
 
+<div class="top-bar">
+  <div class="brand">JEWELS<span>-</span>AI</div>
+  <div class="top-badge">Live Preview</div>
+</div>
+
+<div class="hud">
+  <div class="plans">
+    <div class="plan-card" data-src="advertisement/promo1.mp4">
+      <span class="plan-label">Plan 01</span>
+      <span class="plan-name">Starter</span>
+    </div>
+    <div class="plan-card" data-src="advertisement/promo2.mp4">
+      <span class="plan-label">Plan 02</span>
+      <span class="plan-name">Pro</span>
+    </div>
+    <div class="plan-card" data-src="advertisement/promo3.mp4">
+      <span class="plan-label">Plan 03</span>
+      <span class="plan-name">Elite</span>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="ppBtn" title="Play / Pause">
+      <svg id="iconPlay" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+      <svg id="iconPause" viewBox="0 0 24 24" style="display:none"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+    </button>
+
+    <div class="progress-wrap">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <button class="icon-btn" id="shareBtn" title="Share">
+      <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+    </button>
+  </div>
+</div>
 
 <script>
-  const btn = document.getElementById('ppBtn');
-  const ad = document.getElementById('ad');
-  const cam = document.getElementById('cam');
-  const thumbnails = document.querySelectorAll('.thumbnail');
+  const ad        = document.getElementById('ad');
+  const cam       = document.getElementById('cam');
+  const ppBtn     = document.getElementById('ppBtn');
+  const iconPlay  = document.getElementById('iconPlay');
+  const iconPause = document.getElementById('iconPause');
+  const progress  = document.getElementById('progressBar');
+  const hint      = document.getElementById('hint');
+  const plans     = document.querySelectorAll('.plan-card');
 
-  let videoLoaded = false;
-  let currentVideoSrc = '';
-  let isPlaying = false;
+  let currentSrc = '';
 
   navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-    .then(stream => {
-      cam.srcObject = stream;
-    })
-    .catch(err => alert('Camera error: ' + err));
+    .then(s => cam.srcObject = s)
+    .catch(e => console.warn('Camera:', e));
 
-  thumbnails.forEach(thumbnail => {
-    thumbnail.addEventListener('click', () => {
-      const src = thumbnail.dataset.src;
-      if (src !== currentVideoSrc) {
-        currentVideoSrc = src;
-        ad.src = src;
-        ad.load();
-        ad.volume = 1;
-        videoLoaded = true;
-        ad.style.display = 'block';
-        ad.play();
-        isPlaying = true;
-        btn.innerText = '⏸️';
-        btn.style.display = 'block';
-        thumbnails.forEach(t => t.classList.remove('selected'));
-        thumbnail.classList.add('selected');
-      }
+  ad.addEventListener('timeupdate', () => {
+    if (ad.duration) progress.style.width = (ad.currentTime / ad.duration * 100) + '%';
+  });
+
+  plans.forEach(card => {
+    card.addEventListener('click', () => {
+      const src = card.dataset.src;
+      if (src === currentSrc) return;
+      currentSrc = src;
+      plans.forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+      hint.classList.add('hidden');
+      ad.src = src;
+      ad.load();
+      ad.volume = 1;
+      ad.classList.add('visible');
+      ad.play().then(syncPlay).catch(console.warn);
     });
   });
 
-  btn.addEventListener('click', () => {
-    if (!videoLoaded) return;
-
-    if (ad.paused) {
-      ad.play().then(() => {
-        btn.innerText = '⏸️';
-        isPlaying = true;
-      }).catch(e => {
-        alert('Playback failed: ' + e.message);
-      });
-    } else {
-      ad.pause();
-      btn.innerText = '▶️';
-      isPlaying = false;
-    }
+  ppBtn.addEventListener('click', () => {
+    if (!currentSrc) return;
+    ad.paused ? ad.play().then(syncPlay) : (ad.pause(), syncPause());
   });
+
+  function syncPlay()  { iconPlay.style.display = 'none'; iconPause.style.display = ''; }
+  function syncPause() { iconPlay.style.display = '';     iconPause.style.display = 'none'; }
 
   document.getElementById('shareBtn').addEventListener('click', async () => {
     if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'AR Video',
-          text: 'Check out this amazing AR experience!',
-          url: window.location.href
-        });
-      } catch (err) {
-        console.error('Share failed:', err.message);
-      }
+      try { await navigator.share({ title: 'AR Experience', url: location.href }); } catch(e) {}
     } else {
-      alert('Sharing not supported on this device.');
+      try { await navigator.clipboard.writeText(location.href); alert('Link copied!'); } catch(e) {}
     }
   });
 
-  /* ------------------------------------
-     🔒 Disable Right-Click & Dev Tools
-  ------------------------------------ */
-  document.addEventListener("contextmenu", (e) => e.preventDefault());
-
-  document.addEventListener("keydown", (e) => {
-    if (
-      e.key === "F12" ||
-      (e.ctrlKey && e.shiftKey && ["I", "J", "C"].includes(e.key.toUpperCase())) ||
-      (e.ctrlKey && e.key.toUpperCase() === "U")
-    ) {
+  document.addEventListener('contextmenu', e => e.preventDefault());
+  document.addEventListener('keydown', e => {
+    if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && 'IJC'.includes(e.key.toUpperCase())) || (e.ctrlKey && e.key.toUpperCase() === 'U'))
       e.preventDefault();
-      alert("🚫 Developer Tools are disabled!");
-    }
   });
-
-  // Optional: Detect if DevTools are opened
-  (function devToolsDetector() {
-    const threshold = 160;
-    setInterval(() => {
-      const widthThreshold = window.outerWidth - window.innerWidth > threshold;
-      const heightThreshold = window.outerHeight - window.innerHeight > threshold;
-      if (widthThreshold || heightThreshold) {
-        document.body.innerHTML = "<h1 style='color:red;text-align:center;margin-top:40vh;'>🚫 Developer Tools Detected!</h1>";
-      }
-    }, 1000);
-  })();
 </script>
-
 </body>
 </html>

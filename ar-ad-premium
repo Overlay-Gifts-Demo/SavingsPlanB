@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>AR Experience</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --gold: #C9A84C;
+      --gold-light: #E8C97A;
+      --gold-dark: #8A6B2A;
+      --glass: rgba(255,255,255,0.04);
+      --glass-border: rgba(201,168,76,0.25);
+      --dark: #0A0A0C;
+      --surface: rgba(15,14,18,0.85);
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: var(--dark);
+      font-family: 'Montserrat', sans-serif;
+    }
+
+    /* Camera feed */
+    #cam {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      filter: brightness(0.65);
+    }
+
+    /* Ambient vignette */
+    .vignette {
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at center,
+        transparent 40%, rgba(5,4,8,0.75) 100%);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* Decorative corner marks */
+    .corners {
+      position: absolute; inset: 18px;
+      pointer-events: none;
+      z-index: 2;
+    }
+    .corners::before, .corners::after,
+    .corners span::before, .corners span::after {
+      content: '';
+      position: absolute;
+      width: 22px; height: 22px;
+      border-color: var(--gold);
+      border-style: solid;
+      opacity: 0.6;
+    }
+    .corners::before  { top:0;    left:0;   border-width: 1.5px 0 0 1.5px; }
+    .corners::after   { top:0;    right:0;  border-width: 1.5px 1.5px 0 0; }
+    .corners span::before { bottom:0; left:0;  border-width: 0 0 1.5px 1.5px; }
+    .corners span::after  { bottom:0; right:0; border-width: 0 1.5px 1.5px 0; }
+
+    /* Top bar */
+    .top-bar {
+      position: absolute; top:0; left:0; right:0;
+      z-index: 10;
+      padding: 20px 28px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: linear-gradient(to bottom, rgba(5,4,8,0.7) 0%, transparent 100%);
+    }
+    .brand {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 22px;
+      font-weight: 300;
+      letter-spacing: 0.2em;
+      color: var(--gold-light);
+      text-transform: uppercase;
+    }
+    .status-dot {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 10px; letter-spacing: 0.15em;
+      color: rgba(255,255,255,0.45);
+      text-transform: uppercase;
+    }
+    .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #4ade80;
+      box-shadow: 0 0 6px #4ade80;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    /* Ad video */
+    #ad {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%) scale(0.94);
+      width: min(88vw, 440px);
+      border-radius: 16px;
+      border: 1px solid var(--glass-border);
+      box-shadow:
+        0 0 0 1px rgba(201,168,76,0.08),
+        0 32px 80px rgba(0,0,0,0.7),
+        inset 0 1px 0 rgba(255,255,255,0.07);
+      display: none;
+      z-index: 5;
+      background: #000;
+      opacity: 0;
+      transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    #ad.visible {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    /* Play/Pause */
+    #ppBtn {
+      position: absolute;
+      bottom: calc(50% - min(44vw,220px) - 62px);
+      left: 50%;
+      transform: translateX(-50%);
+      width: 48px; height: 48px;
+      border: 1px solid var(--glass-border);
+      border-radius: 50%;
+      background: var(--surface);
+      backdrop-filter: blur(12px);
+      color: var(--gold-light);
+      font-size: 16px;
+      cursor: pointer;
+      z-index: 10;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.25s ease;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+    }
+    #ppBtn:hover {
+      background: rgba(201,168,76,0.15);
+      border-color: var(--gold);
+      transform: translateX(-50%) scale(1.08);
+    }
+    #ppBtn.show { display: flex; }
+
+    /* Plan selector */
+    .plan-section {
+      position: absolute;
+      bottom: 88px; left:0; right:0;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    .plan-label {
+      font-size: 9px;
+      letter-spacing: 0.25em;
+      color: rgba(255,255,255,0.35);
+      text-transform: uppercase;
+    }
+    .thumbnail-bar { display:flex; gap:10px; }
+    .thumbnail {
+      position: relative;
+      width: 80px; height: 52px;
+      border-radius: 10px;
+      border: 1px solid rgba(201,168,76,0.2);
+      background: var(--surface);
+      backdrop-filter: blur(14px);
+      cursor: pointer;
+      overflow: hidden;
+      transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+    }
+    .thumbnail:hover {
+      border-color: var(--gold);
+      transform: translateY(-3px) scale(1.04);
+      box-shadow: 0 8px 28px rgba(0,0,0,0.5), 0 0 12px rgba(201,168,76,0.15);
+    }
+    .thumbnail.selected {
+      border-color: var(--gold);
+      background: rgba(201,168,76,0.1);
+      box-shadow: 0 0 18px rgba(201,168,76,0.25), inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+    .thumbnail.selected::before {
+      content:'';
+      position:absolute; inset:0;
+      background: linear-gradient(135deg,rgba(201,168,76,0.12) 0%,transparent 60%);
+    }
+    .thumb-icon { font-size:16px; line-height:1; }
+    .thumb-name {
+      font-size: 9px; letter-spacing:0.12em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.7);
+      font-weight: 500;
+    }
+    .thumbnail.selected .thumb-name { color: var(--gold-light); }
+    .thumb-dot {
+      width:4px; height:4px; border-radius:50%;
+      background: var(--gold); opacity:0;
+      transition: opacity 0.3s;
+    }
+    .thumbnail.selected .thumb-dot { opacity:1; }
+
+    /* Bottom bar */
+    .bottom-bar {
+      position: absolute;
+      bottom:0; left:0; right:0;
+      z-index: 10;
+      padding: 16px 32px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      background: linear-gradient(to top, rgba(5,4,8,0.8) 0%, transparent 100%);
+    }
+    .action-btn {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 5px;
+      cursor: pointer; border: none; background: none;
+      padding: 0; -webkit-tap-highlight-color: transparent;
+    }
+    .action-btn-circle {
+      width:46px; height:46px; border-radius:50%;
+      border: 1px solid var(--glass-border);
+      background: var(--surface);
+      backdrop-filter: blur(12px);
+      display:flex; align-items:center; justify-content:center;
+      font-size:18px;
+      transition: all 0.25s ease;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    }
+    .action-btn:hover .action-btn-circle,
+    .action-btn:active .action-btn-circle {
+      border-color: var(--gold);
+      background: rgba(201,168,76,0.12);
+      transform: scale(1.1);
+    }
+    .action-btn-label {
+      font-size:9px; letter-spacing:0.15em;
+      text-transform:uppercase;
+      color:rgba(255,255,255,0.4);
+    }
+    .cta-btn {
+      display:flex; flex-direction:column;
+      align-items:center; gap:5px;
+      cursor:pointer; border:none; background:none;
+      padding:0; -webkit-tap-highlight-color:transparent;
+    }
+    .cta-circle {
+      width:60px; height:60px; border-radius:50%;
+      background: linear-gradient(135deg, var(--gold-light) 0%, var(--gold-dark) 100%);
+      display:flex; align-items:center; justify-content:center;
+      font-size:22px;
+      box-shadow:
+        0 0 0 1px rgba(201,168,76,0.3),
+        0 0 24px rgba(201,168,76,0.35),
+        0 8px 28px rgba(0,0,0,0.5);
+      transition: all 0.25s ease;
+    }
+    .cta-btn:hover .cta-circle,
+    .cta-btn:active .cta-circle {
+      transform: scale(1.08);
+      box-shadow:
+        0 0 0 1px rgba(201,168,76,0.5),
+        0 0 36px rgba(201,168,76,0.5),
+        0 12px 36px rgba(0,0,0,0.6);
+    }
+    .cta-label {
+      font-size:9px; letter-spacing:0.15em;
+      text-transform:uppercase; color:var(--gold);
+    }
+
+    /* Scanline overlay */
+    .scanline {
+      position:absolute; inset:0;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent 0px, transparent 3px,
+        rgba(0,0,0,0.04) 3px, rgba(0,0,0,0.04) 4px
+      );
+      pointer-events:none; z-index:3; opacity:0.5;
+    }
+
+    /* Toast */
+    .toast {
+      position:absolute;
+      top:80px; left:50%;
+      transform: translateX(-50%) translateY(-20px);
+      background: var(--surface);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: blur(16px);
+      border-radius:40px;
+      padding: 8px 20px;
+      font-size:11px; letter-spacing:0.1em;
+      color: var(--gold-light);
+      opacity:0;
+      transition: all 0.35s ease;
+      z-index:20;
+      white-space:nowrap;
+    }
+    .toast.show {
+      opacity:1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* No-camera fallback */
+    #noCam {
+      position:absolute; inset:0; z-index:1;
+      display:flex; align-items:center; justify-content:center;
+      background: linear-gradient(135deg,#0c0b10 0%,#12101a 100%);
+    }
+    #noCam p {
+      color:rgba(255,255,255,0.25);
+      font-size:13px; letter-spacing:0.15em;
+      text-transform:uppercase;
+    }
+  </style>
+</head>
+<body>
+
+<video id="cam" autoplay muted playsinline></video>
+<div id="noCam"><p>Initialising Camera…</p></div>
+
+<div class="scanline"></div>
+<div class="vignette"></div>
+<div class="corners"><span></span></div>
+
+<div class="toast" id="toast"></div>
+
+<div class="top-bar">
+  <div class="brand">AR Studio</div>
+  <div class="status-dot">
+    <div class="dot"></div>
+    Live
+  </div>
+</div>
+
+<video id="ad" playsinline loop></video>
+<button id="ppBtn" title="Play/Pause">▶</button>
+
+<div class="plan-section">
+  <div class="plan-label">Select Experience</div>
+  <div class="thumbnail-bar">
+    <div class="thumbnail" data-src="advertisement/promo1.mp4">
+      <div class="thumb-icon">✦</div>
+      <div class="thumb-name">Plan I</div>
+      <div class="thumb-dot"></div>
+    </div>
+    <div class="thumbnail" data-src="advertisement/promo2.mp4">
+      <div class="thumb-icon">◈</div>
+      <div class="thumb-name">Plan II</div>
+      <div class="thumb-dot"></div>
+    </div>
+    <div class="thumbnail" data-src="advertisement/promo3.mp4">
+      <div class="thumb-icon">⬡</div>
+      <div class="thumb-name">Plan III</div>
+      <div class="thumb-dot"></div>
+    </div>
+  </div>
+</div>
+
+<div class="bottom-bar">
+  <button class="action-btn" id="shareBtn" title="Share">
+    <div class="action-btn-circle">↗</div>
+    <div class="action-btn-label">Share</div>
+  </button>
+  <button class="cta-btn" id="ctaBtn" title="Explore">
+    <div class="cta-circle">★</div>
+    <div class="cta-label">Explore</div>
+  </button>
+  <button class="action-btn" id="muteBtn" title="Mute">
+    <div class="action-btn-circle">🔊</div>
+    <div class="action-btn-label">Sound</div>
+  </button>
+</div>
+
+<script>
+  const ppBtn      = document.getElementById('ppBtn');
+  const ad         = document.getElementById('ad');
+  const cam        = document.getElementById('cam');
+  const thumbnails = document.querySelectorAll('.thumbnail');
+  const shareBtn   = document.getElementById('shareBtn');
+  const muteBtn    = document.getElementById('muteBtn');
+  const ctaBtn     = document.getElementById('ctaBtn');
+  const toastEl    = document.getElementById('toast');
+  const noCam      = document.getElementById('noCam');
+
+  let currentSrc = '';
+  let muted = false;
+  let toastTimer;
+
+  function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2200);
+  }
+
+  // Camera
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+    .then(stream => { cam.srcObject = stream; noCam.style.display = 'none'; })
+    .catch(() => { noCam.querySelector('p').textContent = 'Camera unavailable'; });
+
+  // Plan selection
+  thumbnails.forEach(thumb => {
+    thumb.addEventListener('click', () => {
+      const src = thumb.dataset.src;
+      if (src === currentSrc) return;
+      currentSrc = src;
+
+      ad.classList.remove('visible');
+      setTimeout(() => {
+        ad.src = src;
+        ad.load();
+        ad.volume = muted ? 0 : 1;
+        ad.style.display = 'block';
+        ad.play().then(() => {
+          ad.classList.add('visible');
+          ppBtn.textContent = '⏸';
+          ppBtn.classList.add('show');
+        }).catch(() => {});
+      }, 300);
+
+      thumbnails.forEach(t => t.classList.remove('selected'));
+      thumb.classList.add('selected');
+      showToast(thumb.querySelector('.thumb-name').textContent + ' selected');
+    });
+  });
+
+  // Play/Pause
+  ppBtn.addEventListener('click', () => {
+    if (ad.paused) {
+      ad.play().then(() => { ppBtn.textContent = '⏸'; });
+    } else {
+      ad.pause();
+      ppBtn.textContent = '▶';
+    }
+  });
+
+  // Mute
+  muteBtn.addEventListener('click', () => {
+    muted = !muted;
+    ad.volume = muted ? 0 : 1;
+    muteBtn.querySelector('.action-btn-circle').textContent = muted ? '🔇' : '🔊';
+    showToast(muted ? 'Sound off' : 'Sound on');
+  });
+
+  // Share
+  shareBtn.addEventListener('click', async () => {
+    if (navigator.share) {
+      try { await navigator.share({ title:'AR Experience', url:window.location.href }); }
+      catch(e) {}
+    } else {
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        showToast('Link copied!');
+      } catch { showToast('Sharing not supported'); }
+    }
+  });
+
+  // Explore CTA
+  ctaBtn.addEventListener('click', () => showToast('Opening experience…'));
+
+  // Security
+  document.addEventListener('contextmenu', e => e.preventDefault());
+  document.addEventListener('keydown', e => {
+    if (
+      e.key === 'F12' ||
+      (e.ctrlKey && e.shiftKey && ['I','J','C'].includes(e.key.toUpperCase())) ||
+      (e.ctrlKey && e.key.toUpperCase() === 'U')
+    ) e.preventDefault();
+  });
+
+  (function devToolsDetector() {
+    const threshold = 160;
+    setInterval(() => {
+      if (
+        window.outerWidth - window.innerWidth > threshold ||
+        window.outerHeight - window.innerHeight > threshold
+      ) {
+        document.body.innerHTML = "<h1 style='color:var(--gold,#C9A84C);text-align:center;margin-top:40vh;font-family:serif;letter-spacing:0.2em;'>ACCESS RESTRICTED</h1>";
+      }
+    }, 1000);
+  })();
+</script>
+</body>
+</html>
